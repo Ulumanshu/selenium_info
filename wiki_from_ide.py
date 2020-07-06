@@ -20,8 +20,8 @@ class GridControll():
         self.processes = list()
         # self.condition = Condition()
 
-    def count_processes_by_driver(self, driver_name):
-        return len([p for p in self.processes if driver_name in p.name])
+    def count_processes_by_driver(self, driver_type):
+        return len([p for p in self.processes if driver_type in p.name])
 
     def get_process_by_driver(self, driver_type):
         target_process = False
@@ -42,7 +42,7 @@ class GridControll():
         p_check = [p for p in self.processes if driver_type in p.name ]
         if len(p_check) < self.max_nodes:
             self.spawn_process(method, driver_type)
-            time.sleep(3)
+            time.sleep(2)
         else:
             self.teardown_method(driver_type)
             self.start(method, driver_type)
