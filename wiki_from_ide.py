@@ -11,46 +11,125 @@ from selenium.webdriver.support.wait import WebDriverWait
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.common.desired_capabilities import DesiredCapabilities
 from selenium.webdriver.firefox.firefox_binary import FirefoxBinary
-from multiprocessing import Process
+from multiprocessing import Process #, Condition
 
+class GridControll():
 
-processes = list()
+    def __init__(self, max_nodes = 1):
+        self.max_nodes = max_nodes
+        self.processes = list()
+        # self.condition = Condition()
 
-def remote_firefox_setup():
-    return webdriver.Remote(
-        command_executor='http://127.0.0.1:4444/wd/hub',
-        desired_capabilities={'browserName': 'firefox', 'javascriptEnabled': True}
-    )
+    def count_processes_by_driver(self, driver_name):
+        return len([p for p in self.processes if driver_name in p.name])
 
-def remote_chrome_setup():
-    return webdriver.Remote(
-        command_executor='http://127.0.0.1:4444/wd/hub',
-        desired_capabilities={'browserName': 'chrome', 'javascriptEnabled': True}
-    )
+    def get_process_by_driver(self, driver_type):
+        target_process = False
+        for p in self.processes:
+            if driver_type in p.name:
+                target_process = p
+                break
+        
+        return target_process
+    
+    def remove_inactive_processes(self):
+        for nr, process in enumerate(self.processes):
+            if not process.is_alive():               
+                process.join()
+                self.processes.pop(nr)
 
-def local_firefox_setup():
-    return webdriver.Firefox()
+    def start(self, method, driver_type):
+        p_check = [p for p in self.processes if driver_type in p.name ]
+        if len(p_check) < self.max_nodes:
+            self.spawn_process(method, driver_type)
+            time.sleep(3)
+        else:
+            self.teardown_method(driver_type)
+            self.start(method, driver_type)
 
+    def teardown_method(self, driver_type):        
+        last_process_by_driver = self.get_process_by_driver(driver_type)
+        if last_process_by_driver:
+            last_process_by_driver.join()
+            self.processes.remove(last_process_by_driver)
+            time.sleep(2)
+               
+        self.remove_inactive_processes()
 
-class TestWiki():
-    def setup_method(self, method):
-        self.driver = method()
-        self.vars = {}
+    def spawn_process(self, method, driver_type):
+        p_count = self.count_processes_by_driver(driver_type)
+        p = Process(target=method, name=f"{driver_type} - {p_count + 1}")
+        p.start()
+        print("SPAWN !!!: ", f"{driver_type} - {p_count + 1}", method)
+        self.processes.append(p)
+    
+class TestExample():
+   
+    def __init__(
+        self,
+        driver,
+        grid_remote='http://127.0.0.1:4444/wd/hub',
+        local=False
+    ):
+        self.adpater = {
+            "firefox": {
+                "desired_capabilities": {
+                    'browserName': 'firefox', 'javascriptEnabled': True
+                }
+            },
+            "chrome": {
+                "desired_capabilities": {
+                    'browserName': 'chrome', 'javascriptEnabled': True
+                }
+            }            
+        }
+        self.local = local
+        self.remote = grid_remote
+        self.desired_capabilities = self.adpater.get(driver, dict()).get('desired_capabilities') or\
+            not self.local and {'browserName': 'firefox', 'javascriptEnabled': True} or False
+
+    def adopt_driver(self):
+        if self.local:
+            self.driver = webdriver.Firefox()
+        else:
+            self.driver = webdriver.Remote(
+                command_executor=self.remote,
+                desired_capabilities=self.desired_capabilities
+            )    
 
     def teardown_method(self):
         self.driver.quit()
-
+    
     def print_headers(self):
         for nr, header in enumerate(self.driver.find_elements(By.TAG_NAME, "h2")):
             print(f"HEADER {nr + 1}: {header.text}")
 
+    def test_pigu(self):
+        """Method witch sequentially opens urls from targeted pigu.lt table
+        Urls are opened using webdriver.
+        """
+        self.adopt_driver()
+        self.driver.get('https://pigu.lt/lt/')
+        self.driver.set_window_size(1024, 900)
+        time.sleep(2)
+        products = self.driver.find_elements(By.CLASS_NAME, "product-item-inner")
+        for product in products:
+            self.driver.execute_script("arguments[0].scrollIntoView();", product)
+            price_tag = product.find_element_by_class_name("price.notranslate").text
+            label = product.find_element_by_class_name("product-name").text
+            time.sleep(1)
+            print(f"Product: {label}, Costs: {price_tag} !")
+        self.teardown_method()
+    
     def test_wiki(self):
         """Method witch sequentially opens urls from targeted wikipedia table
 
         Urls are opened using webdriver.
         """
+        self.adopt_driver()
         # Uzkraunamas pirmas puslapis
         self.driver.get("https://www.wikipedia.org/")
+        self.driver.set_window_size(1024, 900)
         time.sleep(1)
         # Parenkama anglu kalba
         self.driver.find_element(By.CSS_SELECTOR, "#js-link-box-en > strong").click()
@@ -95,16 +174,17 @@ class TestWiki():
         self.teardown_method()
 
 
-def spawn_process(method):
-    p = Process(target=method)
-    p.start()
-    processes.append(p)
-
 if __name__ == "__main__":
-    wikiff = TestWiki()
-    wikiff.setup_method(remote_firefox_setup)
-    wikic = TestWiki()
-    wikic.setup_method(remote_chrome_setup) 
-    spawn_process(wikiff.test_wiki)
-    spawn_process(wikic.test_wiki)
+    controll = GridControll()
+    wikiff = TestExample("firefox")
+    wikic = TestExample("chrome")
+    controll.start(wikiff.test_wiki, 'ff')
+    controll.start(wikic.test_pigu, 'ch')
+    controll.start(wikic.test_wiki, 'ch')
+    controll.start(wikiff.test_pigu, 'ff')
+    controll.start(wikiff.test_wiki, 'ff')
+    controll.start(wikic.test_pigu, 'ch')
+    controll.start(wikic.test_wiki, 'ch')
+    controll.start(wikiff.test_pigu, 'ff')
+    
     
