@@ -20,6 +20,19 @@ services:
       - VNC_NO_PASSWORD=1
     ports:
       - "5901:5900"
+  chrome1:
+    image: selenium/node-chrome-debug:3.141.59-20200525
+    container_name: chrome1
+    volumes:
+      - /dev/shm:/dev/shm
+    depends_on:
+      - selenium-hub
+    environment:
+      - HUB_HOST=selenium-hub
+      - HUB_PORT=4444
+      - VNC_NO_PASSWORD=1
+    ports:
+      - "5903:5900"
   firefox:
     image: selenium/node-firefox-debug:3.141.59-20200525
     container_name: firefox
@@ -33,4 +46,18 @@ services:
       - VNC_NO_PASSWORD=1
     ports:
       - "5902:5900"
+  firefox1:
+    image: selenium/node-firefox-debug:3.141.59-20200525
+    container_name: firefox1
+    volumes:
+      - /dev/shm:/dev/shm
+    depends_on:
+      - selenium-hub
+    environment:
+      - HUB_HOST=selenium-hub
+      - HUB_PORT=4444
+      - VNC_NO_PASSWORD=1
+    ports:
+      - "5904:5900"
+
 

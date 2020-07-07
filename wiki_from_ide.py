@@ -11,57 +11,64 @@ from selenium.webdriver.support.wait import WebDriverWait
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.common.desired_capabilities import DesiredCapabilities
 from selenium.webdriver.firefox.firefox_binary import FirefoxBinary
-from multiprocessing import Process #, Condition
+from multiprocessing import Process
 
 class GridControll():
 
-    def __init__(self, max_nodes = 1):
+    def __init__(self, driver_type, max_nodes = 2):
+        self.driver_type = driver_type
         self.max_nodes = max_nodes
         self.processes = list()
-        # self.condition = Condition()
 
-    def count_processes_by_driver(self, driver_type):
-        return len([p for p in self.processes if driver_type in p.name])
+    def p_count(self):
+        return len(self.processes)
 
-    def get_process_by_driver(self, driver_type):
-        target_process = False
-        for p in self.processes:
-            if driver_type in p.name:
-                target_process = p
-                break
-        
-        return target_process
-    
     def remove_inactive_processes(self):
         for nr, process in enumerate(self.processes):
-            if not process.is_alive():               
-                process.join()
-                self.processes.pop(nr)
+            if process.is_alive():               
+                continue
 
-    def start(self, method, driver_type):
-        p_check = [p for p in self.processes if driver_type in p.name ]
-        if len(p_check) < self.max_nodes:
-            self.spawn_process(method, driver_type)
-            time.sleep(2)
-        else:
-            self.teardown_method(driver_type)
-            self.start(method, driver_type)
+            process.join()
+            self.processes.pop(nr)
 
-    def teardown_method(self, driver_type):        
-        last_process_by_driver = self.get_process_by_driver(driver_type)
-        if last_process_by_driver:
-            last_process_by_driver.join()
-            self.processes.remove(last_process_by_driver)
-            time.sleep(2)
-               
-        self.remove_inactive_processes()
-
-    def spawn_process(self, method, driver_type):
-        p_count = self.count_processes_by_driver(driver_type)
-        p = Process(target=method, name=f"{driver_type} - {p_count + 1}")
+    def process(self, object, methods):
+        valid_methods = self.validate_methods(object, methods)
+        p = Process(
+            target=self.run_methods,
+            name=f"{self.driver_type} controller",
+            args=(valid_methods, )
+        )
         p.start()
-        print("SPAWN !!!: ", f"{driver_type} - {p_count + 1}", method)
+        print("SPAWN CONTROLER!!!: ", f"{self.driver_type} - {object}", methods)
+        return p
+    
+    def validate_methods(self, object, methods):
+        return [getattr(object, m) for m in methods if hasattr(object, m)]
+
+    def run_methods(self, methods):
+        for method in methods:
+            self.start(method)
+            time.sleep(2)
+    
+    def start(self, method):
+        spawn = False
+        if len(self.processes) < self.max_nodes:
+            spawn = self.spawn_process(method)
+            time.sleep(1)
+        elif not spawn:
+            self.teardown_method()
+            self.start(method)
+
+    def teardown_method(self):
+        self.remove_inactive_processes()
+        time.sleep(4)        
+
+    def spawn_process(self, method):
+        p = Process(target=method, name=f"{self.driver_type} - {self.p_count() + 1}")
+        p.start()
+        print("SPAWN !!!: ", f"{self.driver_type} - {self.p_count() + 1}", method)
         self.processes.append(p)
+        return True
     
 class TestExample():
    
@@ -85,6 +92,7 @@ class TestExample():
         }
         self.local = local
         self.remote = grid_remote
+        self.driver_name = driver
         self.desired_capabilities = self.adpater.get(driver, dict()).get('desired_capabilities') or\
             not self.local and {'browserName': 'firefox', 'javascriptEnabled': True} or False
 
@@ -151,18 +159,19 @@ class TestExample():
                 "//table[@class='wikitable' and @style='text-align:center;']//*[@href]"
             )
         ]
-        for url in urls:
-            try:                
-                print(f"Visited: {url}")
-                # Keiciamas adresas, naudojamas java scriptas
-                self.driver.execute_script(
-                    f'''window.open("{url}","_self");'''
-                )
-                time.sleep(2)
-                # Atspaudinamos lankomo psl antrashtes
-                self.print_headers()
-            except:
-                continue
+        for nr, url in enumerate(urls):
+            if nr < 3:
+                try:                
+                    print(f"Visited: {url}")
+                    # Keiciamas adresas, naudojamas java scriptas
+                    self.driver.execute_script(
+                        f'''window.open("{url}","_self");'''
+                    )
+                    time.sleep(2)
+                    # Atspaudinamos lankomo psl antrashtes
+                    self.print_headers()
+                except:
+                    continue
 
         time.sleep(2)
         print(f"Visited: {search_res_url}")
@@ -175,16 +184,39 @@ class TestExample():
 
 
 if __name__ == "__main__":
-    controll = GridControll()
     wikiff = TestExample("firefox")
     wikic = TestExample("chrome")
-    controll.start(wikiff.test_wiki, 'ff')
-    controll.start(wikic.test_pigu, 'ch')
-    controll.start(wikic.test_wiki, 'ch')
-    controll.start(wikiff.test_pigu, 'ff')
-    controll.start(wikiff.test_wiki, 'ff')
-    controll.start(wikic.test_pigu, 'ch')
-    controll.start(wikic.test_wiki, 'ch')
-    controll.start(wikiff.test_pigu, 'ff')
-    
+    ff_controll = GridControll(wikiff.driver_name)
+    ch_controll = GridControll(wikic.driver_name)   
+    ff_prc = ff_controll.process(
+        wikiff,
+        [
+            'test_pigu',
+            'test_pigu',
+            'test_pigu',
+            'test_pigu',
+            'test_wiki',
+            'test_wiki',
+            'test_wiki',
+            'test_wiki'           
+        ]
+    )
+    ch_prc = ch_controll.process(
+        wikic,
+        [
+            'test_wiki',
+            'test_wiki',
+            'test_wiki',
+            'test_wiki',
+            'test_pigu',
+            'test_pigu',
+            'test_pigu',
+            'test_pigu'                    
+        ]
+    )
+
+    ff_prc.join()
+    print(f"Joined {ff_prc.name}")
+    ch_prc.join()
+    print(f"Joined {ch_prc.name}")
     
