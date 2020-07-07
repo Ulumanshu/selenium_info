@@ -184,12 +184,15 @@ class TestExample():
 
 
 if __name__ == "__main__":
-    wikiff = TestExample("firefox")
-    wikic = TestExample("chrome")
-    ff_controll = GridControll(wikiff.driver_name)
-    ch_controll = GridControll(wikic.driver_name)   
+
+    # GRID EXAMPLE
+
+    ff = TestExample("firefox")
+    ch = TestExample("chrome")
+    ff_controll = GridControll(ff.driver_name)
+    ch_controll = GridControll(ch.driver_name)   
     ff_prc = ff_controll.process(
-        wikiff,
+        ff,
         [
             'test_pigu',
             'test_pigu',
@@ -202,7 +205,7 @@ if __name__ == "__main__":
         ]
     )
     ch_prc = ch_controll.process(
-        wikic,
+        ch,
         [
             'test_wiki',
             'test_wiki',
@@ -220,3 +223,22 @@ if __name__ == "__main__":
     ch_prc.join()
     print(f"Joined {ch_prc.name}")
     
+    # LOCAL EXAMPLE
+    loc_ff = TestExample("localhost", local=True)
+    loc_controll = GridControll(loc_ff.driver_name)
+    loc_prc = loc_controll.process(
+        loc_ff,
+        [
+            'test_wiki',
+            'test_wiki',
+            'test_wiki',
+            'test_wiki',
+            'test_pigu',
+            'test_pigu',
+            'test_pigu',
+            'test_pigu'                    
+        ]
+    )
+
+    loc_prc.join()
+    print(f"Joined {loc_prc.name}")
