@@ -224,6 +224,7 @@ if __name__ == "__main__":
     print(f"Joined {ch_prc.name}")
     
     # LOCAL EXAMPLE
+
     loc_ff = TestExample("localhost", local=True)
     loc_controll = GridControll(loc_ff.driver_name)
     loc_prc = loc_controll.process(
