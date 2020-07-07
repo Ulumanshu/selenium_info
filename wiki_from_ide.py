@@ -51,24 +51,23 @@ class GridControll():
             time.sleep(2)
     
     def start(self, method):
-        spawn = False
+        self.remove_inactive_processes()
         if len(self.processes) < self.max_nodes:
-            spawn = self.spawn_process(method)
+            self.spawn_process(method)
             time.sleep(1)
-        elif not spawn:
+        else:
             self.teardown_method()
             self.start(method)
 
     def teardown_method(self):
         self.remove_inactive_processes()
-        time.sleep(4)        
+        time.sleep(5)
 
     def spawn_process(self, method):
-        p = Process(target=method, name=f"{self.driver_type} - {self.p_count() + 1}")
+        p = Process(target=method, name=f"{self.driver_type} - {self.p_count()}")
         p.start()
-        print("SPAWN !!!: ", f"{self.driver_type} - {self.p_count() + 1}", method)
+        print("SPAWN !!!: ", f"{self.driver_type} - {self.p_count()}", method)
         self.processes.append(p)
-        return True
     
 class TestExample():
    
